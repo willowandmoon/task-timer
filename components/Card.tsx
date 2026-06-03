@@ -28,7 +28,7 @@ export default function Card({
 
   if (status === "inprogress") {
     return (
-      <div className="card-enter rounded-3xl bg-[#1e1646] p-6 shadow-2xl shadow-violet-900/40">
+      <div className="card-enter rounded-3xl bg-[#2d1869] p-6 shadow-2xl shadow-violet-900/40">
         <div className="flex items-start justify-between mb-5">
           <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center">
             <Zap className="w-5 h-5 text-violet-300" />
@@ -119,7 +119,7 @@ export default function Card({
   }
 
   return (
-    <div className="card-enter rounded-3xl bg-white dark:bg-[#1a1535] border border-gray-100 dark:border-[#2a2450] p-6 shadow-sm hover:shadow-md dark:hover:shadow-violet-900/20 transition-shadow duration-200">
+    <div className="card-enter rounded-3xl bg-white dark:bg-[#18104a] border border-gray-100 dark:border-[#2d1f7a] p-6 shadow-sm hover:shadow-md dark:hover:shadow-violet-900/20 transition-shadow duration-200">
       <div className="flex items-start justify-between mb-5">
         <div className="w-11 h-11 rounded-2xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
           <Clock className="w-5 h-5 text-violet-500 dark:text-violet-400" />

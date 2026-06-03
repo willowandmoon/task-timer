@@ -140,7 +140,7 @@ export default function Home() {
       <section className="flex flex-col gap-3">
         {tasks.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-3xl bg-white dark:bg-[#1a1535] border border-gray-100 dark:border-[#2a2450] shadow-sm flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-3xl bg-white dark:bg-[#18104a] border border-gray-100 dark:border-[#2d1f7a] shadow-sm flex items-center justify-center mx-auto mb-4">
               <Timer className="w-7 h-7 text-violet-300" />
             </div>
             <p className="text-gray-500 dark:text-gray-400 text-sm font-semibold mb-1">

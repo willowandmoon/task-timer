@@ -10,7 +10,7 @@ interface TaskInputProps {
 
 export default function TaskInput({ value, onChange, onSubmit }: TaskInputProps) {
   return (
-    <section className="bg-white dark:bg-[#1a1535] rounded-3xl border border-gray-100 dark:border-[#2a2450] shadow-sm p-3 mb-6 flex items-center gap-2">
+    <section className="bg-white dark:bg-[#18104a] rounded-3xl border border-gray-100 dark:border-[#2d1f7a] shadow-sm p-3 mb-6 flex items-center gap-2">
       <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
         <Zap className="w-4 h-4 text-violet-400" />
       </div>

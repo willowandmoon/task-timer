@@ -17,9 +17,9 @@ export default function HistoryModal({ history, loading, onClose }: HistoryModal
       className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-enter bg-white dark:bg-[#1a1535] rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="modal-enter bg-white dark:bg-[#130c3d] rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
 
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-[#2a2450]">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-[#2d1f7a]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
               <History className="w-4 h-4 text-violet-500 dark:text-violet-400" />
@@ -51,7 +51,7 @@ export default function HistoryModal({ history, loading, onClose }: HistoryModal
             </div>
           ) : history.length === 0 ? (
             <div className="flex flex-col items-center py-10">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-[#2a2450] border border-gray-100 dark:border-[#3a3460] flex items-center justify-center mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-[#1e1260] border border-gray-100 dark:border-[#3525a0] flex items-center justify-center mb-3">
                 <History className="w-5 h-5 text-gray-300 dark:text-gray-600" />
               </div>
               <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">Sin registros aún</p>
