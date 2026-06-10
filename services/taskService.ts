@@ -14,6 +14,12 @@ export async function fetchTasks(): Promise<ServerTask[]> {
   return res.json();
 }
 
+export async function fetchTaskById(id: string): Promise<ServerTask | null> {
+  const res = await fetch(`/api/todolist/${id}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function createTask(title: string): Promise<ServerTask> {
   const res = await fetch("/api/tasks", {
     method: "POST",
