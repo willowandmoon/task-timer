@@ -103,4 +103,5 @@ data/
 # === Temporary files ===
 tmp/
 temp/
-*.bkptsconfig.tsbuildinfo
+*.bkp
+tsconfig.tsbuildinfo
