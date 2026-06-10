@@ -30,8 +30,8 @@ Task Timer es una SPA (Single Page Application) construida con **Next.js 16 (App
 ```
 Usuario escribe tarea → se guarda en MongoDB → aparece como card
 Usuario inicia tarea  → el cronómetro corre en el cliente (cada segundo)
-Usuario finaliza      → el tiempo se guarda en DB → card se auto-archiva en 10s
-Usuario elimina       → la tarea va al historial inmediatamente
+Usuario finaliza      → el tiempo se guarda en DB → la card queda como Completada
+Usuario elimina (X)   → la tarea va al historial ('done' si estaba completada)
 ```
 
 El cronómetro **no depende del servidor** para contar: el cliente calcula el tiempo transcurrido a partir del `startedAt` guardado en la base de datos, por lo que **sobrevive recargas de página** sin perder tiempo.
@@ -95,7 +95,6 @@ task-time/
 │
 ├── lib/
 │   ├── db.ts                     # Singleton de conexión a MongoDB
-│   ├── cleanup.ts                # Limpieza de tareas "done" expiradas
 │   └── models/
 │       ├── Task.ts               # Modelo Mongoose — colección "tasks"
 │       ├── Comment.ts            # Modelo Mongoose — colección "comments"
@@ -204,7 +203,7 @@ Carga las tareas activas al iniciar la app.
 
 **Proceso:**
 1. Conecta a MongoDB
-2. Ejecuta cleanup (archiva automáticamente las tareas `done` con más de 10s)
+2. Calcula `commentCount` por tarea con una agregación sobre `comments`
 3. Retorna todas las tareas ordenadas por `createdAt` descendente
 
 **Respuesta `200`:**
@@ -274,8 +273,8 @@ Elimina una tarea y la archiva en el historial.
 
 **Proceso:**
 1. Busca la tarea
-2. Crea documento en `histories` con `reason: 'deleted'`
-3. Elimina la tarea de `tasks`
+2. Crea documento en `histories` con `reason: 'done'` si estaba completada, o `'deleted'` en otro caso
+3. Elimina la tarea de `tasks` y sus comentarios de `comments`
 
 **Respuesta `200`:**
 ```json
@@ -289,8 +288,7 @@ Elimina una tarea y la archiva en el historial.
 Trae el historial completo.
 
 **Proceso:**
-1. Ejecuta cleanup (por si quedaron tareas `done` sin archivar tras un reload)
-2. Retorna todos los documentos de `histories` ordenados por `archivedAt` descendente
+1. Retorna todos los documentos de `histories` ordenados por `archivedAt` descendente
 
 **Respuesta `200`:**
 ```json
@@ -321,36 +319,9 @@ Verifica que la conexión a MongoDB está activa. Útil para debugging.
 
 ## 6. Lógica del servidor
 
-### Cleanup automático — `lib/cleanup.ts`
+### Archivado de tareas
 
-Las tareas `done` desaparecen del cliente tras 10s (auto-archivado). Pero si el usuario recarga antes de que el cliente las elimine, siguen en la DB. `cleanupExpiredDoneTasks` se llama al inicio de `GET /api/tasks` y `GET /api/history`:
-
-```ts
-export async function cleanupExpiredDoneTasks() {
-  const tenSecondsAgo = new Date(Date.now() - 10_000)
-
-  const expired = await TaskModel.find({
-    status: 'done',
-    updatedAt: { $lte: tenSecondsAgo },   // usa updatedAt, no doneAt (más robusto en hot-reload)
-  })
-
-  if (expired.length === 0) return
-
-  await HistoryModel.insertMany(
-    expired.map(t => ({
-      title: t.title,
-      reason: 'done',
-      inProgressDuration: t.inProgressDuration ?? null,
-      archivedAt: new Date(),
-      originalCreatedAt: t.createdAt,
-    }))
-  )
-
-  await TaskModel.deleteMany({ _id: { $in: expired.map(t => t._id) } })
-}
-```
-
-**Por qué `updatedAt` y no `doneAt`:** En hot-reload de desarrollo, Mongoose puede cachear el esquema sin `doneAt`. `updatedAt` es gestionado internamente por Mongoose y siempre está disponible.
+Las tareas finalizadas **permanecen en la lista** (para poder ver su detalle y comentarios). Solo se archivan al historial cuando el usuario las elimina con la **X**: el servidor crea el documento en `histories` con `reason: 'done'` (si estaba completada) o `'deleted'`, y borra la tarea junto con sus comentarios.
 
 ---
 
@@ -374,8 +345,8 @@ Contiene toda la lógica de estado de la aplicación. Responsabilidades:
 | `formatDuration(seconds)` | Convierte segundos a `MM:SS` o `H:MM:SS` para el historial |
 | `handleCreate()` | POST a `/api/tasks`, agrega al estado local |
 | `handleStart(id)` | PATCH a `inprogress`, registra `startTimestamp` en el estado |
-| `handleFinish(id)` | PATCH a `done`, congela el timer, programa eliminación del estado en 10s |
-| `handleDelete(id)` | DELETE, cancela el timer pendiente si existe, elimina del estado |
+| `handleFinish(id)` | PATCH a `done`, congela el timer — la tarea permanece visible |
+| `handleDelete(id)` | DELETE, elimina del estado y archiva en el historial |
 | `openHistory()` | GET a `/api/history`, abre el modal |
 
 ---
@@ -403,18 +374,18 @@ Renderiza **3 variantes visuales** según `status`:
 #### Variante `done`
 - Fondo verde esmeralda claro, `rounded-3xl`
 - Icono de check en círculo verde
-- Badge `Completada` verde
+- Badge `Completada` verde + badge con número de comentarios
 - Timer verde con tiempo final congelado
-- Barra de progreso que se vacía en 10 segundos
-- Texto "Se archiva en Xs"
+- Botón `Ver detalles`
 
 **Props:**
 ```ts
 interface CardProps {
+  id: string                 // _id real del documento en MongoDB
   title: string
   status: TaskStatus         // 'pending' | 'inprogress' | 'done'
   time: number               // segundos del cronómetro
-  countdown: number | null   // segundos hasta auto-archivado (solo en done)
+  commentCount?: number      // número de comentarios (badge)
   onStart: () => void
   onFinish: () => void
   onDelete: () => void
@@ -445,7 +416,7 @@ const [loadingHistory, setLoadingHistory] = useState(false)
 
 ---
 
-### `useEffect` — 3 instancias
+### `useEffect` — 2 instancias
 
 **1. Carga inicial de tareas** (dependencias vacías — se ejecuta solo al montar)
 ```ts
@@ -465,10 +436,6 @@ useEffect(() => {
         const elapsed = Math.floor((Date.now() - task.startTimestamp) / 1000)
         return { ...task, time: task.accumulatedTime + elapsed }
       }
-      if (task.status === "done" && task.doneAt !== null) {
-        const remaining = Math.max(0, 10 - Math.floor((Date.now() - task.doneAt) / 1000))
-        if (remaining !== task.countdown) return { ...task, countdown: remaining }
-      }
       return task
     }))
   }, 1000)
@@ -476,45 +443,11 @@ useEffect(() => {
 }, [])
 ```
 
-Cada segundo:
-- Las tareas `inprogress` recalculan `elapsed = Date.now() - startTimestamp`
-- Las tareas `done` decrementan el countdown
+Cada segundo las tareas `inprogress` recalculan `elapsed = Date.now() - startTimestamp`.
 
 La clave está en que `startTimestamp` viene del servidor (`new Date(task.startedAt).getTime()`), por lo que **el cronómetro reanuda correctamente tras recargar la página**.
 
-**3. Limpieza de setTimeout al desmontar**
-```ts
-useEffect(() => {
-  return () => doneTimers.current.forEach(t => clearTimeout(t))
-}, [])
-```
-
-Cancela todos los timers pendientes si el componente se desmonta, evitando memory leaks.
-
----
-
-### `useRef` — 1 instancia
-
-```ts
-const doneTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-```
-
-Almacena un `Map` de `taskId → setTimeout` para los auto-archivados. Se usa `useRef` en lugar de `useState` porque:
-
-- **No necesita re-render** al cambiar — es bookkeeping interno
-- Persiste entre renders manteniendo su referencia
-- Permite cancelar un timer específico si el usuario elimina una tarea antes de los 10s
-
-**Flujo:**
-```
-handleFinish(id)
-  ├─ setTimeout 10s → elimina tarea del estado
-  └─ doneTimers.set(id, timerRef)
-
-handleDelete(id)
-  ├─ doneTimers.get(id) → clearTimeout()   ← cancela el auto-archivado
-  └─ doneTimers.delete(id)
-```
+En la vista de detalle (`app/todolist/[id]/page.tsx`) hay un `useEffect` adicional que carga la tarea y sus comentarios al montar.
 
 ---
 
@@ -653,15 +586,6 @@ interface HistoryItem {
 }
 ```
 
-### Tipo extendido local (en `page.tsx`)
-
-```ts
-type LocalTask = Task & {
-  doneAt: number | null    // timestamp para calcular el countdown
-  countdown: number | null // segundos restantes antes de auto-archivar
-}
-```
-
 ### Función `toLocal(t: ServerTask): LocalTask`
 
 Convierte la respuesta del servidor al formato del cliente:
@@ -669,8 +593,8 @@ Convierte la respuesta del servidor al formato del cliente:
 | Caso | Qué hace |
 |---|---|
 | `status === "inprogress"` | Calcula `elapsed = (Date.now() - startedAt) / 1000` para reanudar el timer |
-| `status === "done"` | Calcula `countdown = 10 - (Date.now() - doneAt) / 1000` |
-| `status === "pending"` | Inicializa `time: 0`, `countdown: null` |
+| `status === "done"` | Congela el timer con `inProgressDuration` |
+| `status === "pending"` | Inicializa `time: 0` |
 
 ---
 
@@ -786,7 +710,7 @@ Las vistas nunca llaman a la API directamente: `fetchComments(todoId)` y `create
 
 `GET /api/tasks` calcula `commentCount` con una **agregación** sobre la colección `comments` (`$group` por `todoId`) — el contador **no se guarda** en el documento de la tarea. Cada `Card` muestra el badge con el número junto al estado.
 
-Al eliminar o archivar una tarea, sus comentarios se eliminan también (en `DELETE /api/tasks/:id` y en `lib/cleanup.ts`) para no dejar huérfanos.
+Al eliminar una tarea, sus comentarios se eliminan también (en `DELETE /api/tasks/:id`) para no dejar huérfanos.
 
 ---
 
@@ -815,22 +739,13 @@ PATCH /api/tasks/:id ─────────► MongoDB tasks { status: 'inp
 PATCH /api/tasks/:id ─────────► MongoDB tasks { status: 'done', doneAt: now, inProgressDuration: N }
         │
         ▼
-[Card verde — countdown 10s visible]
+[Card verde — Completada, permanece visible con "Ver detalles"]
         │
-   10s después
-        │
-   ┌────┴──────────────────────────────────────────┐
-   │ Cliente: setTasks filtra la tarea del estado  │
-   │ Servidor (próximo GET): cleanupExpiredDone()  │
-   │   → insertMany histories { reason: 'done' }   │
-   │   → deleteMany tasks                          │
-   └───────────────────────────────────────────────┘
-
   [Presiona X en cualquier momento]
         │
         ▼
-DELETE /api/tasks/:id ────────► insertOne histories { reason: 'deleted' }
-        │                        deleteOne task
+DELETE /api/tasks/:id ────────► insertOne histories { reason: 'done' | 'deleted' }
+        │                        deleteOne task + deleteMany comments
         ▼
 [Card desaparece del estado local inmediatamente]
 ```

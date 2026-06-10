@@ -10,7 +10,6 @@ interface CardProps {
   title: string;
   status: TaskStatus;
   time: number;
-  countdown: number | null;
   commentCount?: number;
   onStart: () => void;
   onFinish: () => void;
@@ -22,14 +21,12 @@ export default function Card({
   title,
   status,
   time,
-  countdown,
   commentCount = 0,
   onStart,
   onFinish,
   onDelete,
 }: CardProps) {
   const router = useRouter();
-  const progress = countdown !== null ? (countdown / 10) * 100 : 0;
   const goToDetail = () => router.push(`/todolist/${id}`);
 
   /* ── EN PROGRESO ─────────────────────────────────────────────────────────
@@ -131,20 +128,6 @@ export default function Card({
             {formatTime(time)}
           </span>
         </div>
-
-        {countdown !== null && (
-          <div className="space-y-2 mb-4">
-            <div className="w-full h-1.5 bg-emerald-200/60 dark:bg-emerald-800/40 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-400 dark:bg-emerald-500 rounded-full"
-                style={{ width: `${progress}%`, transition: "width 0.95s linear" }}
-              />
-            </div>
-            <p className="text-xs text-emerald-600/60 dark:text-emerald-400/70 text-center">
-              Se archiva en <span className="font-semibold">{countdown}s</span>
-            </p>
-          </div>
-        )}
 
         <button
           onClick={goToDetail}

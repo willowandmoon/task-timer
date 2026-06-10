@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Timer } from "lucide-react";
 import Card from "@/components/Card";
 import Header from "@/components/Header";
@@ -17,7 +17,6 @@ export default function Home() {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const doneTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     fetchTasks().then((data) => setTasks(data.map(toLocal)));
@@ -31,19 +30,11 @@ export default function Home() {
             const elapsed = Math.floor((Date.now() - task.startTimestamp) / 1000);
             return { ...task, time: task.accumulatedTime + elapsed };
           }
-          if (task.status === "done" && task.doneAt !== null) {
-            const remaining = Math.max(0, 10 - Math.floor((Date.now() - task.doneAt) / 1000));
-            if (remaining !== task.countdown) return { ...task, countdown: remaining };
-          }
           return task;
         })
       );
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    return () => doneTimers.current.forEach((t) => clearTimeout(t));
   }, []);
 
   async function handleCreate() {
@@ -71,7 +62,6 @@ export default function Home() {
   async function handleFinish(id: string) {
     const updated = await updateTaskStatus(id, "done");
     const finalTime = updated.inProgressDuration ?? 0;
-    const doneAt = Date.now();
 
     setTasks((prev) =>
       prev.map((task) =>
@@ -83,26 +73,13 @@ export default function Home() {
               accumulatedTime: finalTime,
               startTimestamp: null,
               inProgressDuration: finalTime,
-              doneAt,
-              countdown: 10,
             }
           : task
       )
     );
-
-    const timer = setTimeout(() => {
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      doneTimers.current.delete(id);
-    }, 10_000);
-    doneTimers.current.set(id, timer);
   }
 
   async function handleDelete(id: string) {
-    const timer = doneTimers.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      doneTimers.current.delete(id);
-    }
     await deleteTask(id);
     setTasks((prev) => prev.filter((task) => task.id !== id));
   }
@@ -124,17 +101,9 @@ export default function Home() {
       <TaskInput value={input} onChange={setInput} onSubmit={handleCreate} />
 
       {tasks.length > 0 && (
-        <div className="flex items-center justify-between mb-3 px-1">
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Tareas activas
-          </p>
-          <button
-            onClick={openHistory}
-            className="text-xs text-violet-500 dark:text-violet-400 font-medium hover:text-violet-700 dark:hover:text-violet-300 transition-colors cursor-pointer"
-          >
-            Ver historial →
-          </button>
-        </div>
+        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 px-1">
+          Tareas activas
+        </p>
       )}
 
       <section className="flex flex-col gap-3">
@@ -159,7 +128,6 @@ export default function Home() {
               title={task.title}
               status={task.status}
               time={task.time}
-              countdown={task.countdown}
               onStart={() => handleStart(task.id)}
               onFinish={() => handleFinish(task.id)}
               onDelete={() => handleDelete(task.id)}

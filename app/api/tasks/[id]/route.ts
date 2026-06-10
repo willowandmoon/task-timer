@@ -55,7 +55,8 @@ export async function DELETE(
   if (task) {
     await HistoryModel.create({
       title: task.title,
-      reason: 'deleted',
+      // las tareas finalizadas se archivan como 'done'; el resto como 'deleted'
+      reason: task.status === 'done' ? 'done' : 'deleted',
       inProgressDuration: task.inProgressDuration,
       archivedAt: new Date(),
       originalCreatedAt: task.createdAt,

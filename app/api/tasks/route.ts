@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { TaskModel } from '@/lib/models/Task'
 import { CommentModel } from '@/lib/models/Comment'
-import { cleanupExpiredDoneTasks } from '@/lib/cleanup'
 
 export async function GET() {
   await connectDB()
-  await cleanupExpiredDoneTasks()
 
   const tasks = await TaskModel.find().sort({ createdAt: -1 }).lean()
 

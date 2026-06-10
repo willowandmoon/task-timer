@@ -1,7 +1,7 @@
 import type { Task } from "@/types/task";
 import type { ServerTask } from "@/services/taskService";
 
-export type LocalTask = Task & { doneAt: number | null; countdown: number | null };
+export type LocalTask = Task;
 
 export function toLocal(t: ServerTask): LocalTask {
   if (t.status === "inprogress" && t.startedAt) {
@@ -13,13 +13,9 @@ export function toLocal(t: ServerTask): LocalTask {
       time: elapsed,
       accumulatedTime: 0,
       startTimestamp,
-      doneAt: null,
-      countdown: null,
     };
   }
-  if (t.status === "done" && t.doneAt) {
-    const doneAt = new Date(t.doneAt).getTime();
-    const remaining = Math.max(0, 10 - Math.floor((Date.now() - doneAt) / 1000));
+  if (t.status === "done") {
     const time = t.inProgressDuration ?? 0;
     return {
       ...t,
@@ -27,8 +23,6 @@ export function toLocal(t: ServerTask): LocalTask {
       time,
       accumulatedTime: time,
       startTimestamp: null,
-      doneAt,
-      countdown: remaining,
     };
   }
   return {
@@ -37,7 +31,5 @@ export function toLocal(t: ServerTask): LocalTask {
     time: 0,
     accumulatedTime: 0,
     startTimestamp: null,
-    doneAt: null,
-    countdown: null,
   };
 }
