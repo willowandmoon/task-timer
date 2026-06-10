@@ -19,6 +19,7 @@ Aplicación web para gestionar tareas con cronómetro en tiempo real. Permite cr
 11. [Tipos TypeScript](#11-tipos-typescript)
 12. [Variables de entorno](#12-variables-de-entorno)
 13. [Cómo correr el proyecto](#13-cómo-correr-el-proyecto)
+14. [Vista de detalle y comentarios](#14-vista-de-detalle-y-comentarios)
 
 ---
 
@@ -62,24 +63,42 @@ task-time/
 │   │   │   └── route.ts          # GET  /api/health — verifica conexión a DB
 │   │   ├── history/
 │   │   │   └── route.ts          # GET  /api/history — trae el historial
-│   │   └── tasks/
-│   │       ├── route.ts          # GET  /api/tasks  — lista tareas activas
-│   │       │                     # POST /api/tasks  — crea nueva tarea
-│   │       └── [id]/
-│   │           └── route.ts      # PATCH  /api/tasks/:id — cambia estado
-│   │                             # DELETE /api/tasks/:id — elimina y archiva
+│   │   ├── tasks/
+│   │   │   ├── route.ts          # GET  /api/tasks  — lista tareas activas (+commentCount)
+│   │   │   │                     # POST /api/tasks  — crea nueva tarea
+│   │   │   └── [id]/
+│   │   │       └── route.ts      # PATCH  /api/tasks/:id — cambia estado
+│   │   │                         # DELETE /api/tasks/:id — elimina y archiva
+│   │   ├── todolist/
+│   │   │   └── [dato]/
+│   │   │       └── route.ts      # GET /api/todolist/:dato — trae un item por ID
+│   │   └── comments/
+│   │       ├── route.ts          # POST /api/comments — crea un comentario
+│   │       └── [todoId]/
+│   │           └── route.ts      # GET /api/comments/:todoId — comentarios de una tarea
+│   ├── todolist/
+│   │   └── [id]/
+│   │       └── page.tsx          # Vista de detalle de una tarea con comentarios
 │   ├── globals.css               # Estilos globales + animaciones CSS + HeroUI styles
 │   ├── layout.tsx                # Layout raíz: fuentes, fondo, metadata
 │   └── page.tsx                  # Página principal — toda la lógica del cliente
 │
 ├── components/
-│   └── Card.tsx                  # Componente de tarjeta (3 variantes visuales)
+│   ├── Card.tsx                  # Componente de tarjeta (3 variantes visuales)
+│   ├── CommentForm.tsx           # Formulario para agregar comentarios
+│   └── CommentList.tsx           # Historial de comentarios (con estado vacío)
+│
+├── services/
+│   ├── taskService.ts            # Fetch de tareas (lista, por id, crear, actualizar, borrar)
+│   ├── historyService.ts         # Fetch del historial
+│   └── comments.ts               # Fetch de comentarios (listar, crear)
 │
 ├── lib/
 │   ├── db.ts                     # Singleton de conexión a MongoDB
 │   ├── cleanup.ts                # Limpieza de tareas "done" expiradas
 │   └── models/
 │       ├── Task.ts               # Modelo Mongoose — colección "tasks"
+│       ├── Comment.ts            # Modelo Mongoose — colección "comments"
 │       └── History.ts            # Modelo Mongoose — colección "histories"
 │
 ├── types/
@@ -719,6 +738,55 @@ npm start
 | `npm run build` | Build optimizado para producción |
 | `npm start` | Inicia el servidor de producción |
 | `npm run lint` | ESLint sobre todo el proyecto |
+
+---
+
+## 14. Vista de detalle y comentarios
+
+### Navegación (HU-01)
+
+Cada `Card` recibe el `id` real del documento de MongoDB y un botón **"Ver detalles"** que navega programáticamente con `useRouter` de `next/navigation` (no se usa `<Link>` ni `window.location`):
+
+```tsx
+const router = useRouter();
+<button onClick={() => router.push(`/todolist/${id}`)}>Ver detalles</button>
+```
+
+El `_id` queda visible en la URL: `/todolist/6a294dabfa4c41e4dade72f8`.
+
+### Vista de detalle — `app/todolist/[id]/page.tsx`
+
+- Lee el parámetro con `useParams()` y carga la tarea (`GET /api/todolist/[dato]`) y sus comentarios (`GET /api/comments/[todoId]`) en un `useEffect` al montar.
+- Muestra: título, estado (`pending` / `inprogress` / `done`), fecha de inicio y fecha de fin (si existen).
+- Si la tarea no existe: **"Tarea no encontrada."**
+- Si no hay comentarios: **"No hay comentarios aún. ¡Sé el primero en comentar!"**
+- Al enviar el formulario, el comentario se guarda en MongoDB, el input se limpia y el comentario aparece al final del historial **sin recargar la página** (actualización optimista del estado local con `useState`).
+
+### Modelo `Comment` — `lib/models/Comment.ts`
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `todoId` | `ObjectId` (ref `Task`) | Tarea a la que pertenece el comentario |
+| `content` | `String` | Contenido del comentario |
+| `createdAt` | `Date` | Automático (Mongoose timestamps) |
+
+### API de comentarios
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/todolist/[dato]` | Trae un item por su `_id` (404 si no existe) |
+| `GET` | `/api/comments/[todoId]` | Comentarios de una tarea, ordenados por `createdAt` ascendente |
+| `POST` | `/api/comments` | Crea un comentario `{ todoId, content }` — valida que la tarea exista |
+
+### Capa de servicios — `services/comments.ts`
+
+Las vistas nunca llaman a la API directamente: `fetchComments(todoId)` y `createComment(todoId, content)` encapsulan los fetch, y `fetchTaskById(id)` vive en `services/taskService.ts`.
+
+### Contador de comentarios en la card (opcional — implementado)
+
+`GET /api/tasks` calcula `commentCount` con una **agregación** sobre la colección `comments` (`$group` por `todoId`) — el contador **no se guarda** en el documento de la tarea. Cada `Card` muestra el badge con el número junto al estado.
+
+Al eliminar o archivar una tarea, sus comentarios se eliminan también (en `DELETE /api/tasks/:id` y en `lib/cleanup.ts`) para no dejar huérfanos.
 
 ---
 
