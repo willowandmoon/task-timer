@@ -1,5 +1,6 @@
 import { TaskModel } from './models/Task'
 import { HistoryModel } from './models/History'
+import { CommentModel } from './models/Comment'
 
 export async function cleanupExpiredDoneTasks() {
   const tenSecondsAgo = new Date(Date.now() - 10_000)
@@ -22,5 +23,7 @@ export async function cleanupExpiredDoneTasks() {
       originalCreatedAt: (t.createdAt as Date) ?? new Date(),
     }))
   )
-  await TaskModel.deleteMany({ _id: { $in: expired.map((t) => t._id) } })
+  const expiredIds = expired.map((t) => t._id)
+  await TaskModel.deleteMany({ _id: { $in: expiredIds } })
+  await CommentModel.deleteMany({ todoId: { $in: expiredIds } })
 }

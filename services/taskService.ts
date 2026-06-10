@@ -7,6 +7,7 @@ export type ServerTask = {
   startedAt?: string | null;
   doneAt?: string | null;
   inProgressDuration?: number | null;
+  commentCount?: number;
 };
 
 export async function fetchTasks(): Promise<ServerTask[]> {

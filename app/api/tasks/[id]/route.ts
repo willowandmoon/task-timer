@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { TaskModel } from '@/lib/models/Task'
 import { HistoryModel } from '@/lib/models/History'
+import { CommentModel } from '@/lib/models/Comment'
 
 export async function PATCH(
   req: Request,
@@ -60,6 +61,7 @@ export async function DELETE(
       originalCreatedAt: task.createdAt,
     })
     await task.deleteOne()
+    await CommentModel.deleteMany({ todoId: task._id })
   }
 
   return NextResponse.json({ ok: true })

@@ -8,6 +8,7 @@ export interface Task {
   accumulatedTime: number;
   startTimestamp: number | null;
   inProgressDuration: number | null;
+  commentCount?: number;
 }
 
 export interface HistoryItem {

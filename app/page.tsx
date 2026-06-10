@@ -154,6 +154,8 @@ export default function Home() {
           tasks.map((task) => (
             <Card
               key={task.id}
+              id={task.id}
+              commentCount={task.commentCount ?? 0}
               title={task.title}
               status={task.status}
               time={task.time}
